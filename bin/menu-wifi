@@ -1,0 +1,10 @@
+#!/bin/sh
+# menus-managed: agusc01/menus
+set -eu
+MENUS_HOME=${MENUS_HOME:-"$HOME/.config/menus"}
+. "$MENUS_HOME/lib/wifi-menu.sh"
+case "${0##*/}" in
+    dmenu_wifi) wifi_menu dmenu ;;
+    fzf_wifi) wifi_menu fzf ;;
+    *) echo 'Usage: dmenu_wifi or fzf_wifi' >&2; exit 2 ;;
+esac
