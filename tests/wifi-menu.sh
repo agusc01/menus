@@ -16,6 +16,8 @@ printf 'SSID: %s\nSignal: -44 dBm\n' "$1"
 MOCK
 cat > "$workspace/bin/dmenu" <<'MOCK'
 #!/bin/sh
+printf '%s\n' "$@" >> "$MENU_TEST_DMENU_ARGS"
+echo 'CALL' >> "$MENU_TEST_DMENU_CALLS"
 cat >/dev/null
 [ "${MOCK_CANCEL:-0}" = 1 ] && exit 1
 if [ "${MOCK_INVALID:-0}" = 1 ]; then
@@ -33,8 +35,18 @@ MOCK
 chmod +x "$workspace/bin/"*
 PATH="$workspace/bin:$PATH"; export PATH
 MENUS_HOME=$root; export MENUS_HOME
+MENU_TEST_DMENU_ARGS="$workspace/dmenu-args"; export MENU_TEST_DMENU_ARGS
+MENU_TEST_DMENU_CALLS="$workspace/dmenu-calls"; export MENU_TEST_DMENU_CALLS
 
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+[ "$(wc -l < "$MENU_TEST_DMENU_CALLS")" -eq 1 ] || {
+    echo 'Error: dmenu opened more than one screen.' >&2
+    exit 1
+}
+grep -Fx -- '-title' "$MENU_TEST_DMENU_ARGS" >/dev/null
+grep -Fx -- 'Wi-Fi Networks' "$MENU_TEST_DMENU_ARGS" >/dev/null
+grep -Fx -- '-preview' "$MENU_TEST_DMENU_ARGS" >/dev/null
+grep -Fx -- 'wifi_info' "$MENU_TEST_DMENU_ARGS" >/dev/null
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu fzf' > "$workspace/output"
 grep -F 'Signal: -44 dBm' "$workspace/output" >/dev/null
 MOCK_CANCEL=1; export MOCK_CANCEL
