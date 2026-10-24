@@ -7,8 +7,12 @@ No Bash, Fish, Rofi, NetworkManager, or retired `linux-tools`,
 
 ## Wi-Fi (first, read-only milestone)
 
-- `dmenu_wifi`: select a visible SSID and show its details in a second
-  dmenu screen. A generic dynamic dmenu preview patch is planned separately.
+- `dmenu_wifi`: show a title above the search field, and the selected
+  network's live information in a right-side dmenu preview panel. Requires
+  the updated [agusc01/dmenu](https://github.com/agusc01/dmenu) fork with
+  `-title` and `-preview` support (feature branch `feat/header-preview-pane`
+  until merged).
+- `dmenu_wifi` no longer opens a second details screen after selection.
 - `fzf_wifi`: select the same SSIDs with a dynamic `wifi_info` preview.
 
 These do **not** connect, disconnect or alter saved Wi-Fi settings.
@@ -28,6 +32,22 @@ The commands are created under `~/.local/bin`. If the Wi-Fi menu says the
 scan is inaccessible, try `wifi_status`, `wifi_list`, and review the
 `sh` Wi-Fi README. It intentionally never invokes `doas` or restarts
 networking on its own.
+
+The graphical menu launches `wifi_info` as a preview command through
+our fork of dmenu, directly passing the highlighted SSID as an argument.
+No shell interpolation is used. Press Escape to cancel; selecting a network
+just closes the menu and does not connect to it. The fzf interface keeps
+its independent live preview and prints the chosen network's details.
+
+Install the updated dmenu executable before trying `dmenu_wifi`:
+
+```sh
+cd "$HOME/.config/dmenu"
+git fetch origin
+git switch feat/header-preview-pane
+make clean && make
+doas make install
+```
 
 Tests (mock `wifi_list`, `wifi_info`, dmenu and fzf):
 
