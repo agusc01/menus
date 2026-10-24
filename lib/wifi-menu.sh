@@ -21,7 +21,7 @@ wifi_menu() {
                 echo 'Error: dmenu is missing.' >&2; return 1
             }
             selected=$(printf '%s\n' "$networks" |
-                dmenu -i -c -l 10 -p 'Wi-Fi') || return 0
+                dmenu -i -l 10 -p 'Wi-Fi') || return 0
             ;;
         fzf)
             command -v fzf >/dev/null 2>&1 || {
@@ -48,7 +48,7 @@ wifi_menu() {
     if [ "$mode" = dmenu ]; then
         # Temporary second screen until dmenu supports custom previews.
         printf '%s\n' "$details" |
-            dmenu -c -l 8 -p 'Network details' >/dev/null || :
+            dmenu -l 8 -p 'Network details' >/dev/null || :
     else
         printf '%s\n' "$details"
     fi
