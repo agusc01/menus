@@ -21,7 +21,11 @@ wifi_menu() {
                 echo 'Error: dmenu is missing.' >&2; return 1
             }
             selected=$(printf '%s\n' "$networks" |
-                dmenu -i -l 10 -p 'Wi-Fi') || return 0
+                dmenu -i -c -l 10 -p 'Search' \
+                    -title 'Wi-Fi Networks' \
+                    -preview wifi_info \
+                    -preview-title 'Network details' \
+                    -preview-pos right -preview-size 45) || return 0
             ;;
         fzf)
             command -v fzf >/dev/null 2>&1 || {
@@ -43,13 +47,9 @@ wifi_menu() {
         echo 'Error: Selection is not an available SSID.' >&2
         return 1
     fi
-    details=$(wifi_info "$selected") || return 1
-
-    if [ "$mode" = dmenu ]; then
-        # Temporary second screen until dmenu supports custom previews.
-        printf '%s\n' "$details" |
-            dmenu -l 8 -p 'Network details' >/dev/null || :
-    else
-        printf '%s\n' "$details"
+    # dmenu displayed the information while navigating; never open a second
+    # screen or perform a network-changing action when an SSID is selected.
+    if [ "$mode" = fzf ]; then
+        wifi_info "$selected"
     fi
 }
