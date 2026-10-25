@@ -126,8 +126,13 @@ wifi_menu() {
 
     if printf '%s\n' "$saved" | grep -F -x -- "$selected" >/dev/null; then
         options=$(printf 'Connect saved network\nForget saved network\nDisconnect Wi-Fi\nCancel')
-    else
+    elif command -v wifi_join_supported >/dev/null 2>&1 &&
+         wifi_join_supported "$selected" >/dev/null 2>&1; then
         options=$(printf 'Join new WPA2 network\nDisconnect Wi-Fi\nCancel')
+    else
+        # Avoid prompting for credentials on open, WPA3-only, enterprise,
+        # mixed-security, or stale/offline SSIDs.
+        options=$(printf 'Unsupported network (view only)\nDisconnect Wi-Fi\nCancel')
     fi
     action=$(wifi_menu_action_choice "$mode" "$selected" "$options") || return 0
 
@@ -160,7 +165,7 @@ wifi_menu() {
                 wifi_disconnect --confirm
             fi
             ;;
-        'Cancel'|'')
+        'Unsupported network (view only)'|'Cancel'|'')
             return 0
             ;;
         *)
