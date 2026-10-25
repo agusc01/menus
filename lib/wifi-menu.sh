@@ -32,6 +32,14 @@ wifi_menu_confirm() {
 wifi_menu_join_new() {
     join_mode=$1
     join_network=$2
+    join_persistence=$3
+    # The password travels on stdin. This option only controls whether the
+    # backend explicitly saves the new profile or leaves it in memory.
+    case "$join_persistence" in
+        temporary) set -- --temporary "$join_network" ;;
+        saved) set -- "$join_network" ;;
+        *) echo 'Error: Unknown Wi-Fi persistence choice.' >&2; return 2 ;;
+    esac
     command -v wifi_join_new >/dev/null 2>&1 || {
         echo 'Error: Update agusc01/sh to enable WPA2 enrollment.' >&2
         return 1
@@ -42,7 +50,7 @@ wifi_menu_join_new() {
             join_password=$(printf '' |
                 dmenu -P -c -title "Password for $join_network" -p 'Password') || return 0
             [ -n "$join_password" ] || return 0
-            printf '%s\n' "$join_password" | wifi_join_new "$join_network"
+            printf '%s\n' "$join_password" | wifi_join_new "$@"
             join_password=''
             ;;
         fzf)
@@ -63,7 +71,7 @@ wifi_menu_join_new() {
                 stty "$saved_tty" </dev/tty
                 trap - 0 1 2 3 15
                 [ -n "$join_password" ] || exit 0
-                printf '%s\n' "$join_password" | wifi_join_new "$join_network"
+                printf '%s\n' "$join_password" | wifi_join_new "$@"
                 join_password=''
             )
             ;;
@@ -128,7 +136,7 @@ wifi_menu() {
         options=$(printf 'Connect saved network\nForget saved network\nDisconnect Wi-Fi\nCancel')
     elif command -v wifi_join_supported >/dev/null 2>&1 &&
          wifi_join_supported "$selected" >/dev/null 2>&1; then
-        options=$(printf 'Join new WPA2 network\nDisconnect Wi-Fi\nCancel')
+        options=$(printf 'Join WPA2 temporarily\nJoin WPA2 and save\nDisconnect Wi-Fi\nCancel')
     else
         # Avoid prompting for credentials on open, WPA3-only, enterprise,
         # mixed-security, or stale/offline SSIDs.
@@ -137,8 +145,11 @@ wifi_menu() {
     action=$(wifi_menu_action_choice "$mode" "$selected" "$options") || return 0
 
     case "$action" in
-        'Join new WPA2 network')
-            wifi_menu_join_new "$mode" "$selected"
+        'Join WPA2 temporarily')
+            wifi_menu_join_new "$mode" "$selected" temporary
+            ;;
+        'Join WPA2 and save')
+            wifi_menu_join_new "$mode" "$selected" saved
             ;;
         'Connect saved network')
             command -v wifi_connect_saved >/dev/null 2>&1 || {
