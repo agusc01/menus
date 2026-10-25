@@ -8,7 +8,7 @@ wifi_menu_action_choice() {
     case "$menu_mode" in
         dmenu)
             printf '%s\n' "$menu_options" |
-                dmenu -i -c -l 6 -title "$menu_title" -p 'Action'
+                dmenu -i -c -l 8 -title "$menu_title" -p 'Action'
             ;;
         fzf)
             printf '%s\n' "$menu_options" |
