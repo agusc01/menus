@@ -38,7 +38,12 @@ cat > "$workspace/bin/wifi_join_new" <<'MOCK'
 #!/bin/sh
 IFS= read -r password || exit 1
 [ "$password" = 'samplepass123' ] || exit 1
-printf 'join:%s:%s\n' "$1" "${#password}" >> "$MENU_TEST_ACTIONS"
+if [ "$1" = --temporary ]; then
+    shift
+    printf 'join-temporary:%s:%s\n' "$1" "${#password}" >> "$MENU_TEST_ACTIONS"
+else
+    printf 'join-saved:%s:%s\n' "$1" "${#password}" >> "$MENU_TEST_ACTIONS"
+fi
 MOCK
 cat > "$workspace/bin/dmenu" <<'MOCK'
 #!/bin/sh
@@ -138,11 +143,15 @@ grep -Fx 'forget:Home:5G:--confirm' "$MENU_TEST_ACTIONS" >/dev/null
 # New WPA2 enrollment is possible only through the explicit action and a
 # masked password prompt. The fake backend checks stdin without logging it.
 MOCK_NETWORK='Guest Lounge'; export MOCK_NETWORK
-MOCK_ACTION='Join new WPA2 network'; export MOCK_ACTION
+MOCK_ACTION='Join WPA2 and save'; export MOCK_ACTION
 MOCK_PASSWORD='samplepass123'; export MOCK_PASSWORD
 : > "$MENU_TEST_ACTIONS"
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
-grep -Fx 'join:Guest Lounge:13' "$MENU_TEST_ACTIONS" >/dev/null
+grep -Fx 'join-saved:Guest Lounge:13' "$MENU_TEST_ACTIONS" >/dev/null
+MOCK_ACTION='Join WPA2 temporarily'; export MOCK_ACTION
+: > "$MENU_TEST_ACTIONS"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+grep -Fx 'join-temporary:Guest Lounge:13' "$MENU_TEST_ACTIONS" >/dev/null
 grep -Fx -- '-P' "$MENU_TEST_DMENU_ARGS" >/dev/null
 if grep -F 'samplepass123' "$MENU_TEST_DMENU_ARGS" >/dev/null; then
     echo 'Error: Secret appeared in dmenu arguments.' >&2; exit 1
@@ -157,7 +166,7 @@ MOCK_ACTION=Cancel; export MOCK_ACTION
 : > "$MENU_TEST_CHOICES"
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
 grep -Fx 'Unsupported network (view only)' "$MENU_TEST_CHOICES" >/dev/null
-if grep -Fx 'Join new WPA2 network' "$MENU_TEST_CHOICES" >/dev/null; then
+if grep -E -x 'Join WPA2 temporarily|Join WPA2 and save' "$MENU_TEST_CHOICES" >/dev/null; then
     echo 'Error: Unsupported network offered enrollment.' >&2
     exit 1
 fi
