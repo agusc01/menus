@@ -19,7 +19,7 @@ Network browsing remains read-only. Choosing a network now opens an explicit
 action chooser. A saved network can be connected or forgotten; disconnection
 is also available. Forget and disconnect have separate confirmation screens,
 with **No** as the default. Selecting a network never changes Wi-Fi by itself.
-New unsaved networks remain view-only until secure password input is supported.
+Unsaved networks are joinable only when their advertised security is supported by the new masked WPA2 flow.
 No default dmenu prompt should be used for Wi-Fi passwords.
 `init-alpine` installs dmenu/fzf packages and Wi-Fi utilities. The `menus`
 installer only installs its own user commands.
@@ -66,3 +66,27 @@ Tests (mock `wifi_list`, `wifi_saved`, Wi-Fi writes, dmenu and fzf):
 ```sh
 sh tests/wifi-menu.sh
 ```
+
+
+### Joining a new network
+
+An unsaved, visible network now offers **Join new WPA2 network**. Choosing
+that action opens a masked password prompt using the suckless `dmenu -P`
+patch, adapted for our dmenu fork and vendored as a historical diff under
+`agusc01/dmenu/patches/dmenu-password-5.0.diff`. On the terminal frontend,
+`fzf` has no password-masking feature, so the menu reads from `/dev/tty`
+with echo temporarily disabled and always restores the terminal mode.
+
+No password is passed in an executable's arguments, displayed in a preview,
+or stored in a menu-managed file. It is sent through standard input to
+`wifi_join_new SSID`, which lives in the independent `agusc01/sh`
+`feat/wifi-join-new` branch. The backend only enrolls WPA2-Personal
+networks; other network types are rejected with a clear message.
+
+Required test branches until the PRs are merged:
+- dmenu: `feat/masked-password-input`
+- sh: `feat/wifi-join-new`
+- menus: `feat/wifi-join-new`
+
+Always run the mocked tests first; real joining will modify the
+wpa_supplicant configuration and may disconnect an existing network.
