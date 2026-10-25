@@ -96,3 +96,9 @@ For unsaved SSIDs, the action menu offers WPA2 enrollment only if
 Unsupported, ambiguous and stale scan entries remain view-only.
 After `wifi_scan`, give the wpa_supplicant cache a few seconds to update
 before reopening the menu.
+
+WPA2/WPA3 transition hotspots advertising flags such as
+`[WPA2-PSK+SAE-CCMP][ESS]` are now joinable through their WPA2-PSK
+capability. WPA3-only networks are still view-only until a separate SAE
+implementation is available. `sh` remains responsible for validating the
+scan and setting the corresponding `key_mgmt WPA-PSK` profile.
