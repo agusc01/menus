@@ -136,3 +136,21 @@ Persistence setup is a separate explicit root-owned operation documented
 in agusc01/sh/scripts/enable-wpa-saving.sh. The menu never edits the
 wpa_supplicant.conf file or reloads services itself. If save_config fails,
 users can still select the existing **Join WPA2 temporarily** action.
+
+## Save and enable Wi-Fi auto-reconnect
+
+Saved networks now offer **Enable auto-reconnect** in the action chooser.
+This calls wifi_enable_saved SSID --confirm after a Yes/No confirmation.
+The backend enables the chosen saved profile with `enable_network ID no-connect`
+and persists the resulting state with save_config, without switching away
+from the current Wi-Fi.
+
+When a user manually switches to a saved or new SSID, the backend also
+restores previously enabled profiles in no-connect mode. Already disabled
+profiles remain disabled until the user explicitly enables them.
+
+After using Enable auto-reconnect, verify with:
+
+    wpa_cli -i wlan0 list_networks
+
+An enabled inactive profile should no longer show [DISABLED].
