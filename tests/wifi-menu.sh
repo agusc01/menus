@@ -7,7 +7,7 @@ mkdir -p "$workspace/bin"
 
 cat > "$workspace/bin/wifi_list" <<'MOCK'
 #!/bin/sh
-printf 'Home:5G\nGuest Lounge\n'
+printf 'Home:5G\nGuest Lounge\nOpen Hotspot\n'
 MOCK
 cat > "$workspace/bin/wifi_saved" <<'MOCK'
 #!/bin/sh
@@ -29,6 +29,11 @@ cat > "$workspace/bin/wifi_forget_saved" <<'MOCK'
 #!/bin/sh
 printf 'forget:%s:%s\n' "$1" "$2" >> "$MENU_TEST_ACTIONS"
 MOCK
+cat > "$workspace/bin/wifi_join_supported" <<'MOCK'
+#!/bin/sh
+# Guest Lounge stands for a WPA2 network in this menu-only test.
+[ "$1" = 'Guest Lounge' ]
+MOCK
 cat > "$workspace/bin/wifi_join_new" <<'MOCK'
 #!/bin/sh
 IFS= read -r password || exit 1
@@ -39,7 +44,7 @@ cat > "$workspace/bin/dmenu" <<'MOCK'
 #!/bin/sh
 printf '%s\n' "$@" >> "$MENU_TEST_DMENU_ARGS"
 echo CALL >> "$MENU_TEST_DMENU_CALLS"
-cat >/dev/null
+cat >> "$MENU_TEST_CHOICES"
 [ "${MOCK_CANCEL:-0}" = 1 ] && exit 1
 case " $* " in
     *' -P '*) printf '%s\n' "${MOCK_PASSWORD:-samplepass123}" ;;
@@ -74,6 +79,7 @@ MENUS_HOME=$root; export MENUS_HOME
 MENU_TEST_DMENU_ARGS="$workspace/dmenu-args"; export MENU_TEST_DMENU_ARGS
 MENU_TEST_DMENU_CALLS="$workspace/dmenu-calls"; export MENU_TEST_DMENU_CALLS
 MENU_TEST_ACTIONS="$workspace/actions"; export MENU_TEST_ACTIONS
+MENU_TEST_CHOICES="$workspace/choices"; export MENU_TEST_CHOICES
 
 # Existing network preview remains in the first chooser; next chooser is
 # an explicit action selection, not an automatic connect.
@@ -142,6 +148,20 @@ if grep -F 'samplepass123' "$MENU_TEST_DMENU_ARGS" >/dev/null; then
     echo 'Error: Secret appeared in dmenu arguments.' >&2; exit 1
 fi
 unset MOCK_NETWORK MOCK_PASSWORD
+: > "$MENU_TEST_ACTIONS"
+
+# An unsupported, unsaved SSID must remain view-only; do not ask for a
+# password if the sh eligibility backend says it cannot be enrolled.
+MOCK_NETWORK='Open Hotspot'; export MOCK_NETWORK
+MOCK_ACTION=Cancel; export MOCK_ACTION
+: > "$MENU_TEST_CHOICES"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+grep -Fx 'Unsupported network (view only)' "$MENU_TEST_CHOICES" >/dev/null
+if grep -Fx 'Join new WPA2 network' "$MENU_TEST_CHOICES" >/dev/null; then
+    echo 'Error: Unsupported network offered enrollment.' >&2
+    exit 1
+fi
+unset MOCK_NETWORK
 : > "$MENU_TEST_ACTIONS"
 
 unset MOCK_ACTION MOCK_CONFIRM
