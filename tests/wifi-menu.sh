@@ -49,13 +49,13 @@ esac
 MOCK
 cat > "$workspace/bin/fzf" <<'MOCK'
 #!/bin/sh
-cat >/dev/null
+choices=$(cat)
 [ "${MOCK_CANCEL:-0}" = 1 ] && exit 1
 case " $* " in
     *'--preview='*) echo Home:5G ;;
     *)
-        case "${MOCK_PROMPTING:-action}" in
-            confirmation) printf '%s\n' "${MOCK_CONFIRM:-No}" ;;
+        case "$choices" in
+            "$(printf 'No\nYes')") printf '%s\n' "${MOCK_CONFIRM:-No}" ;;
             *) printf '%s\n' "${MOCK_ACTION:-Cancel}" ;;
         esac
         ;;
@@ -109,6 +109,18 @@ sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
 MOCK_CONFIRM=Yes; export MOCK_CONFIRM
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
 grep -Fx 'disconnect:--confirm' "$MENU_TEST_ACTIONS" >/dev/null
+
+# fzf has the same confirmation barrier as dmenu.
+MOCK_ACTION='Forget saved network'; export MOCK_ACTION
+MOCK_CONFIRM=No; export MOCK_CONFIRM
+: > "$MENU_TEST_ACTIONS"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu fzf'
+[ ! -s "$MENU_TEST_ACTIONS" ] || {
+    echo 'Error: fzf declined forget reached backend.' >&2; exit 1
+}
+MOCK_CONFIRM=Yes; export MOCK_CONFIRM
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu fzf'
+grep -Fx 'forget:Home:5G:--confirm' "$MENU_TEST_ACTIONS" >/dev/null
 
 unset MOCK_ACTION MOCK_CONFIRM
 MOCK_CANCEL=1; export MOCK_CANCEL
