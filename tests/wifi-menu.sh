@@ -29,6 +29,12 @@ cat > "$workspace/bin/wifi_forget_saved" <<'MOCK'
 #!/bin/sh
 printf 'forget:%s:%s\n' "$1" "$2" >> "$MENU_TEST_ACTIONS"
 MOCK
+cat > "$workspace/bin/wifi_join_new" <<'MOCK'
+#!/bin/sh
+IFS= read -r password || exit 1
+[ "$password" = 'samplepass123' ] || exit 1
+printf 'join:%s:%s\n' "$1" "${#password}" >> "$MENU_TEST_ACTIONS"
+MOCK
 cat > "$workspace/bin/dmenu" <<'MOCK'
 #!/bin/sh
 printf '%s\n' "$@" >> "$MENU_TEST_DMENU_ARGS"
@@ -36,8 +42,9 @@ echo CALL >> "$MENU_TEST_DMENU_CALLS"
 cat >/dev/null
 [ "${MOCK_CANCEL:-0}" = 1 ] && exit 1
 case " $* " in
+    *' -P '*) printf '%s\n' "${MOCK_PASSWORD:-samplepass123}" ;;
     *' -preview '*)
-        [ "${MOCK_INVALID:-0}" = 1 ] && echo unknown || echo Home:5G
+        [ "${MOCK_INVALID:-0}" = 1 ] && echo unknown || echo "${MOCK_NETWORK:-Home:5G}"
         ;;
     *'Forget Home:5G?'*|*'Disconnect Wi-Fi?'*)
         printf '%s\n' "${MOCK_CONFIRM:-No}"
@@ -121,6 +128,21 @@ sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu fzf'
 MOCK_CONFIRM=Yes; export MOCK_CONFIRM
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu fzf'
 grep -Fx 'forget:Home:5G:--confirm' "$MENU_TEST_ACTIONS" >/dev/null
+
+# New WPA2 enrollment is possible only through the explicit action and a
+# masked password prompt. The fake backend checks stdin without logging it.
+MOCK_NETWORK='Guest Lounge'; export MOCK_NETWORK
+MOCK_ACTION='Join new WPA2 network'; export MOCK_ACTION
+MOCK_PASSWORD='samplepass123'; export MOCK_PASSWORD
+: > "$MENU_TEST_ACTIONS"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+grep -Fx 'join:Guest Lounge:13' "$MENU_TEST_ACTIONS" >/dev/null
+grep -Fx -- '-P' "$MENU_TEST_DMENU_ARGS" >/dev/null
+if grep -F 'samplepass123' "$MENU_TEST_DMENU_ARGS" >/dev/null; then
+    echo 'Error: Secret appeared in dmenu arguments.' >&2; exit 1
+fi
+unset MOCK_NETWORK MOCK_PASSWORD
+: > "$MENU_TEST_ACTIONS"
 
 unset MOCK_ACTION MOCK_CONFIRM
 MOCK_CANCEL=1; export MOCK_CANCEL
