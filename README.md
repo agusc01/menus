@@ -90,3 +90,9 @@ Required test branches until the PRs are merged:
 
 Always run the mocked tests first; real joining will modify the
 wpa_supplicant configuration and may disconnect an existing network.
+
+For unsaved SSIDs, the action menu offers WPA2 enrollment only if
+`wifi_join_supported 'SSID'` from the updated `sh` package succeeds.
+Unsupported, ambiguous and stale scan entries remain view-only.
+After `wifi_scan`, give the wpa_supplicant cache a few seconds to update
+before reopening the menu.
