@@ -102,3 +102,17 @@ WPA2/WPA3 transition hotspots advertising flags such as
 capability. WPA3-only networks are still view-only until a separate SAE
 implementation is available. `sh` remains responsible for validating the
 scan and setting the corresponding `key_mgmt WPA-PSK` profile.
+
+### Persisted versus temporary connections
+
+Compatible, unsaved WPA2 networks now offer two **explicit** choices:
+
+- `Join WPA2 temporarily`: keep a profile in the current `wpa_supplicant`
+  process only; do not call `save_config`. This works even if disk saving
+  is disabled, though connection and DHCP still must be verified.
+- `Join WPA2 and save`: save the new profile before switching; abort and
+  roll back if `save_config` returns `FAIL`. The running connection remains
+  unchanged on that initial persistence failure.
+
+Both choices use the same masked password entry. There is no automatic
+fallback: a failed persisted join must not silently change the active Wi-Fi.
