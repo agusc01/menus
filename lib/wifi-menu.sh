@@ -133,14 +133,14 @@ wifi_menu() {
     fi
 
     if printf '%s\n' "$saved" | grep -F -x -- "$selected" >/dev/null; then
-        options=$(printf 'Connect saved network\nForget saved network\nDisconnect Wi-Fi\nCancel')
+        options=$(printf 'Connect saved network\nForget saved network\nCheck current Internet\nRenew current DHCP\nDisconnect Wi-Fi\nCancel')
     elif command -v wifi_join_supported >/dev/null 2>&1 &&
          wifi_join_supported "$selected" >/dev/null 2>&1; then
-        options=$(printf 'Join WPA2 temporarily\nJoin WPA2 and save\nDisconnect Wi-Fi\nCancel')
+        options=$(printf 'Join WPA2 temporarily\nJoin WPA2 and save\nCheck current Internet\nRenew current DHCP\nDisconnect Wi-Fi\nCancel')
     else
         # Avoid prompting for credentials on open, WPA3-only, enterprise,
         # mixed-security, or stale/offline SSIDs.
-        options=$(printf 'Unsupported network (view only)\nDisconnect Wi-Fi\nCancel')
+        options=$(printf 'Unsupported network (view only)\nCheck current Internet\nRenew current DHCP\nDisconnect Wi-Fi\nCancel')
     fi
     action=$(wifi_menu_action_choice "$mode" "$selected" "$options") || return 0
 
@@ -165,6 +165,22 @@ wifi_menu() {
             }
             if wifi_menu_confirm "$mode" "Forget $selected?"; then
                 wifi_forget_saved "$selected" --confirm
+            fi
+            ;;
+        'Check current Internet')
+            command -v wifi_internet_status >/dev/null 2>&1 || {
+                echo 'Error: Update agusc01/sh to check Internet.' >&2
+                return 1
+            }
+            wifi_internet_status
+            ;;
+        'Renew current DHCP')
+            command -v wifi_dhcp_renew >/dev/null 2>&1 || {
+                echo 'Error: Update agusc01/sh to renew DHCP.' >&2
+                return 1
+            }
+            if wifi_menu_confirm "$mode" 'Renew DHCP on CURRENT Wi-Fi?'; then
+                wifi_dhcp_renew --confirm
             fi
             ;;
         'Disconnect Wi-Fi')
