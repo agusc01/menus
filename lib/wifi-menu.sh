@@ -1,5 +1,30 @@
 #!/bin/sh
-# Single Wi-Fi menu flow; only the selection backend differs.
+# Shared Wi-Fi menu flow for dmenu and fzf. Network operations live in sh.
+
+wifi_menu_action_choice() {
+    menu_mode=$1
+    menu_title=$2
+    menu_options=$3
+    case "$menu_mode" in
+        dmenu)
+            printf '%s\n' "$menu_options" |
+                dmenu -i -c -l 6 -title "$menu_title" -p 'Action'
+            ;;
+        fzf)
+            printf '%s\n' "$menu_options" |
+                fzf --height=60% --reverse --prompt='Action > '
+            ;;
+    esac
+}
+
+wifi_menu_confirm() {
+    confirm_mode=$1
+    confirm_message=$2
+    # Default selection is No; confirmation requires explicitly choosing Yes.
+    answer=$(wifi_menu_action_choice "$confirm_mode" "$confirm_message" \
+        "$(printf 'No\nYes')") || return 1
+    [ "$answer" = Yes ]
+}
 
 wifi_menu() {
     mode=$1
@@ -9,9 +34,16 @@ wifi_menu() {
         return 1
     }
 
-    networks=$(wifi_list) || return 1
+    visible=$(wifi_list) || return 1
+    # Include out-of-range saved networks so they can still be managed.
+    saved=''
+    if command -v wifi_saved >/dev/null 2>&1; then
+        saved=$(wifi_saved 2>/dev/null) || saved=''
+    fi
+    networks=$(printf '%s\n%s\n' "$visible" "$saved" |
+        awk 'NF && !seen[$0]++ { print }')
     [ -n "$networks" ] || {
-        echo 'No visible Wi-Fi networks. Try wifi_scan and reopen this menu.' >&2
+        echo 'No Wi-Fi networks available. Try wifi_scan and reopen the menu.' >&2
         return 1
     }
 
@@ -42,14 +74,51 @@ wifi_menu() {
     esac
     [ -n "$selected" ] || return 0
 
-    # dmenu allows arbitrary text; accept only an exact visible SSID.
+    # dmenu accepts typed text; never act on an unknown SSID.
     if ! printf '%s\n' "$networks" | grep -F -x -- "$selected" >/dev/null; then
         echo 'Error: Selection is not an available SSID.' >&2
         return 1
     fi
-    # dmenu displayed the information while navigating; never open a second
-    # screen or perform a network-changing action when an SSID is selected.
-    if [ "$mode" = fzf ]; then
-        wifi_info "$selected"
+
+    if printf '%s\n' "$saved" | grep -F -x -- "$selected" >/dev/null; then
+        options=$(printf 'Connect saved network\nForget saved network\nDisconnect Wi-Fi\nCancel')
+    else
+        options=$(printf 'Not saved (view only)\nDisconnect Wi-Fi\nCancel')
     fi
+    action=$(wifi_menu_action_choice "$mode" "$selected" "$options") || return 0
+
+    case "$action" in
+        'Connect saved network')
+            command -v wifi_connect_saved >/dev/null 2>&1 || {
+                echo 'Error: Update agusc01/sh to use Wi-Fi actions.' >&2
+                return 1
+            }
+            wifi_connect_saved "$selected"
+            ;;
+        'Forget saved network')
+            command -v wifi_forget_saved >/dev/null 2>&1 || {
+                echo 'Error: Update agusc01/sh to use Wi-Fi actions.' >&2
+                return 1
+            }
+            if wifi_menu_confirm "$mode" "Forget $selected?"; then
+                wifi_forget_saved "$selected" --confirm
+            fi
+            ;;
+        'Disconnect Wi-Fi')
+            command -v wifi_disconnect >/dev/null 2>&1 || {
+                echo 'Error: Update agusc01/sh to use Wi-Fi actions.' >&2
+                return 1
+            }
+            if wifi_menu_confirm "$mode" 'Disconnect Wi-Fi?'; then
+                wifi_disconnect --confirm
+            fi
+            ;;
+        'Not saved (view only)'|'Cancel'|'')
+            return 0
+            ;;
+        *)
+            echo 'Error: Invalid Wi-Fi action.' >&2
+            return 1
+            ;;
+    esac
 }
