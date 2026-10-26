@@ -116,3 +116,23 @@ Compatible, unsaved WPA2 networks now offer two **explicit** choices:
 
 Both choices use the same masked password entry. There is no automatic
 fallback: a failed persisted join must not silently change the active Wi-Fi.
+
+
+### Checking IP and Internet; renewing DHCP
+
+The action chooser now offers **Check current Internet** and
+**Renew current DHCP**. Both apply to the CURRENTLY CONNECTED interface,
+not necessarily to the SSID highlighted in the list. Checking Internet
+prints the separate IPv4, default route, ICMP and DNS diagnostic results
+to the launching terminal; it is never called by the live preview.
+
+Renew current DHCP requires explicit No/Yes confirmation and then invokes
+the standalone sh command wifi_dhcp_renew --confirm. That backend only
+signals a verified already-running BusyBox udhcpc process. It does not
+spawn a competing DHCP daemon or reset the interface. Root-owned DHCP
+clients may require doas approval in a terminal.
+
+Persistence setup is a separate explicit root-owned operation documented
+in agusc01/sh/scripts/enable-wpa-saving.sh. The menu never edits the
+wpa_supplicant.conf file or reloads services itself. If save_config fails,
+users can still select the existing **Join WPA2 temporarily** action.

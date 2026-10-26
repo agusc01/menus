@@ -29,6 +29,17 @@ cat > "$workspace/bin/wifi_forget_saved" <<'MOCK'
 #!/bin/sh
 printf 'forget:%s:%s\n' "$1" "$2" >> "$MENU_TEST_ACTIONS"
 MOCK
+cat > "$workspace/bin/wifi_internet_status" <<'MOCK'
+#!/bin/sh
+echo 'checked-current-internet' >> "$MENU_TEST_ACTIONS"
+echo 'IP probe (mock): reachable'
+echo 'DNS probe (mock): resolved'
+MOCK
+cat > "$workspace/bin/wifi_dhcp_renew" <<'MOCK'
+#!/bin/sh
+[ "$1" = --confirm ] || exit 2
+echo 'renew-current-dhcp' >> "$MENU_TEST_ACTIONS"
+MOCK
 cat > "$workspace/bin/wifi_join_supported" <<'MOCK'
 #!/bin/sh
 # Guest Lounge stands for a WPA2 network in this menu-only test.
@@ -56,7 +67,7 @@ case " $* " in
     *' -preview '*)
         [ "${MOCK_INVALID:-0}" = 1 ] && echo unknown || echo "${MOCK_NETWORK:-Home:5G}"
         ;;
-    *'Forget Home:5G?'*|*'Disconnect Wi-Fi?'*)
+    *'Forget Home:5G?'*|*'Disconnect Wi-Fi?'*|*'Renew DHCP on CURRENT Wi-Fi?'*)
         printf '%s\n' "${MOCK_CONFIRM:-No}"
         ;;
     *)
@@ -172,6 +183,23 @@ if grep -E -x 'Join WPA2 temporarily|Join WPA2 and save' "$MENU_TEST_CHOICES" >/
 fi
 unset MOCK_NETWORK
 : > "$MENU_TEST_ACTIONS"
+
+# Internet check must be on demand; it does not run while browsing SSIDs.
+MOCK_ACTION='Check current Internet'; export MOCK_ACTION
+: > "$MENU_TEST_ACTIONS"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu' |
+    grep -F 'IP probe (mock): reachable' >/dev/null
+grep -Fx 'checked-current-internet' "$MENU_TEST_ACTIONS" >/dev/null
+MOCK_ACTION='Renew current DHCP'; export MOCK_ACTION
+MOCK_CONFIRM=No; export MOCK_CONFIRM
+: > "$MENU_TEST_ACTIONS"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+[ ! -s "$MENU_TEST_ACTIONS" ] || {
+    echo 'Error: Rejected DHCP renewal reached backend.' >&2; exit 1
+}
+MOCK_CONFIRM=Yes; export MOCK_CONFIRM
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+grep -Fx 'renew-current-dhcp' "$MENU_TEST_ACTIONS" >/dev/null
 
 unset MOCK_ACTION MOCK_CONFIRM
 MOCK_CANCEL=1; export MOCK_CANCEL
