@@ -21,6 +21,11 @@ cat > "$workspace/bin/wifi_connect_saved" <<'MOCK'
 #!/bin/sh
 printf 'connect:%s\n' "$1" >> "$MENU_TEST_ACTIONS"
 MOCK
+cat > "$workspace/bin/wifi_enable_saved" <<'MOCK'
+#!/bin/sh
+[ "$2" = --confirm ] || exit 2
+printf 'enable-saved:%s:%s\n' "$1" "$2" >> "$MENU_TEST_ACTIONS"
+MOCK
 cat > "$workspace/bin/wifi_disconnect" <<'MOCK'
 #!/bin/sh
 printf 'disconnect:%s\n' "$1" >> "$MENU_TEST_ACTIONS"
@@ -67,7 +72,7 @@ case " $* " in
     *' -preview '*)
         [ "${MOCK_INVALID:-0}" = 1 ] && echo unknown || echo "${MOCK_NETWORK:-Home:5G}"
         ;;
-    *'Forget Home:5G?'*|*'Disconnect Wi-Fi?'*|*'Renew DHCP on CURRENT Wi-Fi?'*)
+    *'Forget Home:5G?'*|*'Disconnect Wi-Fi?'*|*'Renew DHCP on CURRENT Wi-Fi?'*|*'Enable auto-reconnect for Home:5G?'*)
         printf '%s\n' "${MOCK_CONFIRM:-No}"
         ;;
     *)
@@ -200,6 +205,18 @@ sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
 MOCK_CONFIRM=Yes; export MOCK_CONFIRM
 sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
 grep -Fx 'renew-current-dhcp' "$MENU_TEST_ACTIONS" >/dev/null
+
+# Enabling auto-reconnect should be explicit and independently confirmed.
+MOCK_ACTION='Enable auto-reconnect'; export MOCK_ACTION
+MOCK_CONFIRM=No; export MOCK_CONFIRM
+: > "$MENU_TEST_ACTIONS"
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+[ ! -s "$MENU_TEST_ACTIONS" ] || {
+    echo 'Error: Refused profile enable reached backend.' >&2; exit 1
+}
+MOCK_CONFIRM=Yes; export MOCK_CONFIRM
+sh -c '. "$MENUS_HOME/lib/wifi-menu.sh"; wifi_menu dmenu'
+grep -Fx 'enable-saved:Home:5G:--confirm' "$MENU_TEST_ACTIONS" >/dev/null
 
 unset MOCK_ACTION MOCK_CONFIRM
 MOCK_CANCEL=1; export MOCK_CANCEL

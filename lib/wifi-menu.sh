@@ -8,7 +8,7 @@ wifi_menu_action_choice() {
     case "$menu_mode" in
         dmenu)
             printf '%s\n' "$menu_options" |
-                dmenu -i -c -l 6 -title "$menu_title" -p 'Action'
+                dmenu -i -c -l 8 -title "$menu_title" -p 'Action'
             ;;
         fzf)
             printf '%s\n' "$menu_options" |
@@ -133,7 +133,7 @@ wifi_menu() {
     fi
 
     if printf '%s\n' "$saved" | grep -F -x -- "$selected" >/dev/null; then
-        options=$(printf 'Connect saved network\nForget saved network\nCheck current Internet\nRenew current DHCP\nDisconnect Wi-Fi\nCancel')
+        options=$(printf 'Connect saved network\nEnable auto-reconnect\nForget saved network\nCheck current Internet\nRenew current DHCP\nDisconnect Wi-Fi\nCancel')
     elif command -v wifi_join_supported >/dev/null 2>&1 &&
          wifi_join_supported "$selected" >/dev/null 2>&1; then
         options=$(printf 'Join WPA2 temporarily\nJoin WPA2 and save\nCheck current Internet\nRenew current DHCP\nDisconnect Wi-Fi\nCancel')
@@ -157,6 +157,15 @@ wifi_menu() {
                 return 1
             }
             wifi_connect_saved "$selected"
+            ;;
+        'Enable auto-reconnect')
+            command -v wifi_enable_saved >/dev/null 2>&1 || {
+                echo 'Error: Update agusc01/sh for saved-network enable support.' >&2
+                return 1
+            }
+            if wifi_menu_confirm "$mode" "Enable auto-reconnect for $selected?"; then
+                wifi_enable_saved "$selected" --confirm
+            fi
             ;;
         'Forget saved network')
             command -v wifi_forget_saved >/dev/null 2>&1 || {
