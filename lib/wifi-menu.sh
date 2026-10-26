@@ -26,6 +26,58 @@ wifi_menu_confirm() {
     [ "$answer" = Yes ]
 }
 
+
+# Only the password bytes go through stdin to the sh backend. Neither
+# password nor derived PSK is ever part of a process command line.
+wifi_menu_join_new() {
+    join_mode=$1
+    join_network=$2
+    join_persistence=$3
+    # The password travels on stdin. This option only controls whether the
+    # backend explicitly saves the new profile or leaves it in memory.
+    case "$join_persistence" in
+        temporary) set -- --temporary "$join_network" ;;
+        saved) set -- "$join_network" ;;
+        *) echo 'Error: Unknown Wi-Fi persistence choice.' >&2; return 2 ;;
+    esac
+    command -v wifi_join_new >/dev/null 2>&1 || {
+        echo 'Error: Update agusc01/sh to enable WPA2 enrollment.' >&2
+        return 1
+    }
+    case "$join_mode" in
+        dmenu)
+            # -P is the suckless password patch, integrated in our fork.
+            join_password=$(printf '' |
+                dmenu -P -c -title "Password for $join_network" -p 'Password') || return 0
+            [ -n "$join_password" ] || return 0
+            printf '%s\n' "$join_password" | wifi_join_new "$@"
+            join_password=''
+            ;;
+        fzf)
+            # fzf has no native password mask. Read from the controlling TTY
+            # with echo disabled, restoring its mode even on interruption.
+            (
+                if [ ! -r /dev/tty ]; then
+                    echo 'Error: A terminal is required for masked password input.' >&2
+                    exit 1
+                fi
+                saved_tty=$(stty -g </dev/tty) || exit 1
+                trap 'stty "$saved_tty" </dev/tty' 0
+                trap 'exit 130' 1 2 3 15
+                stty -echo </dev/tty || exit 1
+                printf 'WPA2 password for %s: ' "$join_network" >/dev/tty
+                IFS= read -r join_password </dev/tty || exit 1
+                printf '\n' >/dev/tty
+                stty "$saved_tty" </dev/tty
+                trap - 0 1 2 3 15
+                [ -n "$join_password" ] || exit 0
+                printf '%s\n' "$join_password" | wifi_join_new "$@"
+                join_password=''
+            )
+            ;;
+    esac
+}
+
 wifi_menu() {
     mode=$1
     command -v wifi_list >/dev/null 2>&1 &&
@@ -82,12 +134,23 @@ wifi_menu() {
 
     if printf '%s\n' "$saved" | grep -F -x -- "$selected" >/dev/null; then
         options=$(printf 'Connect saved network\nForget saved network\nDisconnect Wi-Fi\nCancel')
+    elif command -v wifi_join_supported >/dev/null 2>&1 &&
+         wifi_join_supported "$selected" >/dev/null 2>&1; then
+        options=$(printf 'Join WPA2 temporarily\nJoin WPA2 and save\nDisconnect Wi-Fi\nCancel')
     else
-        options=$(printf 'Not saved (view only)\nDisconnect Wi-Fi\nCancel')
+        # Avoid prompting for credentials on open, WPA3-only, enterprise,
+        # mixed-security, or stale/offline SSIDs.
+        options=$(printf 'Unsupported network (view only)\nDisconnect Wi-Fi\nCancel')
     fi
     action=$(wifi_menu_action_choice "$mode" "$selected" "$options") || return 0
 
     case "$action" in
+        'Join WPA2 temporarily')
+            wifi_menu_join_new "$mode" "$selected" temporary
+            ;;
+        'Join WPA2 and save')
+            wifi_menu_join_new "$mode" "$selected" saved
+            ;;
         'Connect saved network')
             command -v wifi_connect_saved >/dev/null 2>&1 || {
                 echo 'Error: Update agusc01/sh to use Wi-Fi actions.' >&2
@@ -113,7 +176,7 @@ wifi_menu() {
                 wifi_disconnect --confirm
             fi
             ;;
-        'Not saved (view only)'|'Cancel'|'')
+        'Unsupported network (view only)'|'Cancel'|'')
             return 0
             ;;
         *)
